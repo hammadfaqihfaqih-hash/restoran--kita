@@ -1,0 +1,761 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Restoran</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f5f5;color:#222;font-family:Arial,sans-serif}
+header{background:#b91c1c;color:#fff;padding:16px;position:sticky;top:0;z-index:2}
+header .bar{max-width:1100px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:10px}
+main{max-width:1100px;margin:auto;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.box{background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 2px 12px #0001}
+input,textarea,select{width:100%;padding:11px;border:1px solid #ccc;border-radius:9px;font-size:15px}
+label{display:block;font-weight:bold;margin:10px 0 5px}
+button{border:0;border-radius:9px;padding:10px 13px;font-weight:bold;cursor:pointer}
+.primary{background:#b91c1c;color:#fff}
+.green{background:#198754;color:#fff}
+.gray{background:#777;color:#fff}
+.danger{background:#dc3545;color:#fff}
+.blue{background:#2563eb;color:#fff}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.logo{width:110px;height:110px;border-radius:50%;object-fit:cover;border:4px solid #eee;display:block;margin:auto}
+.menu{border:1px solid #ddd;border-radius:12px;padding:12px}
+.menu img{width:100%;height:150px;object-fit:cover;border-radius:9px}
+.orders{display:grid;gap:12px}
+.order{border:1px solid #ddd;border-radius:12px;padding:12px}
+.badge{display:inline-block;padding:5px 8px;border-radius:20px;background:#eee;font-size:12px}
+.muted{color:#666;font-size:13px}
+.hidden{display:none}
+</style>
+</head>
+
+<body>
+
+<header>
+<div class="bar">
+<div>
+<b>⚙️ ADMIN RESTORAN</b>
+<div id="who" class="muted" style="color:#eee"></div>
+</div>
+
+<button class="gray" onclick="logout()">Keluar</button>
+</div>
+</header>
+
+<main>
+
+<section class="box">
+<h2>🏪 Profil Toko</h2>
+
+<img id="logoPreview" class="logo">
+
+<label>Nama restoran</label>
+<input id="restoName">
+
+<label>Logo/foto toko</label>
+<input id="logoFile" type="file" accept="image/*">
+
+<label>Atau URL gambar</label>
+<input id="logoUrl" placeholder="https://...">
+
+<label>📍 Lokasi toko</label>
+<input id="location" placeholder="Alamat toko atau link Google Maps">
+
+<div class="actions">
+<button class="primary" onclick="saveSettings()">
+Simpan Profil
+</button>
+</div>
+</section>
+
+
+<section class="box">
+
+<h2>🍽️ Tambah / Edit Menu</h2>
+
+<input type="hidden" id="editId">
+
+<div class="grid">
+
+<div>
+<label>Nama</label>
+<input id="name">
+</div>
+
+<div>
+<label>Kategori</label>
+<select id="category">
+<option>Makanan</option>
+<option>Minuman</option>
+<option>Snack</option>
+</select>
+</div>
+
+<div>
+<label>Harga</label>
+<input id="price" type="number" min="0">
+</div>
+
+<div>
+<label>Stok</label>
+<input id="stock" type="number" min="0">
+</div>
+
+</div>
+
+<label>Foto menu dari galeri</label>
+<input id="imageFile" type="file" accept="image/*">
+
+<label>Atau URL gambar</label>
+<input id="image" placeholder="https://...">
+
+<img id="imagePreview"
+style="display:none;width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-top:8px">
+
+<label>Deskripsi</label>
+<textarea id="desc" rows="3"></textarea>
+
+<div class="actions">
+
+<button class="green" onclick="saveMenu()">
+💾 Simpan
+</button>
+
+<button class="gray" onclick="resetMenu()">
+Menu Baru
+</button>
+
+</div>
+
+</section>
+
+
+<section class="box">
+<h2>📦 Semua Menu</h2>
+<div id="menus" class="grid"></div>
+</section>
+
+
+<section class="box">
+
+<h2>📋 Pesanan Masuk</h2>
+
+<div class="actions">
+<button class="blue" onclick="loadOrders()">
+🔄 Refresh
+</button>
+</div>
+
+<div id="orders" class="orders"></div>
+
+</section>
+
+
+<section class="box">
+
+<h2>🔑 Ganti Password</h2>
+
+<div class="grid">
+
+<input
+id="oldPass"
+type="password"
+placeholder="Password lama">
+
+<input
+id="newPass"
+type="password"
+placeholder="Password baru minimal 6 karakter">
+
+</div>
+
+<div class="actions">
+
+<button class="primary" onclick="changePassword()">
+Ganti Password
+</button>
+
+</div>
+
+</section>
+
+</main>
+
+
+<script>
+
+let currentLogo="";
+let currentImage="";
+
+const $=id=>document.getElementById(id);
+
+
+async function api(url,opt={}){
+
+const r=await fetch(url,opt);
+
+if(r.status===401){
+
+location.href="/admin";
+throw 0;
+
+}
+
+const d=await r.json();
+
+if(!r.ok)
+throw new Error(d.error||"Terjadi kesalahan");
+
+return d;
+
+}
+
+
+async function boot(){
+
+try{
+
+$("who").textContent=
+"Login sebagai "+
+(await api("/api/me")).username;
+
+const s=
+await api("/api/settings");
+
+$("restoName").value=s.name;
+
+currentLogo=s.logo;
+
+showLogo(s.logo);
+
+$("location").value=s.location||"";
+
+await loadMenus();
+
+await loadOrders();
+
+}catch(e){
+
+if(e)
+alert(e.message);
+
+}
+
+}
+
+
+function showLogo(src){
+
+$("logoPreview").src=
+src||
+"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='110' height='110'%3E%3Crect width='100%25' height='100%25' fill='%23ddd'/%3E%3Ctext x='50%25' y='55%25' text-anchor='middle'%3ELOGO%3C/text%3E%3C/svg%3E";
+
+}
+
+
+$("logoFile").onchange=async e=>{
+
+const f=e.target.files[0];
+
+if(!f)return;
+
+const fd=new FormData();
+
+fd.append("image",f);
+
+try{
+
+currentLogo=
+(await api(
+"/api/admin/upload",
+{
+method:"POST",
+body:fd
+}
+)).url;
+
+showLogo(currentLogo);
+
+$("logoUrl").value="";
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+};
+
+
+$("logoUrl").oninput=e=>{
+
+currentLogo=e.target.value;
+
+showLogo(currentLogo);
+
+};
+
+
+async function saveSettings(){
+
+try{
+
+await api(
+"/api/admin/settings",
+{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+
+name:$("restoName").value,
+logo:currentLogo,
+location:$("location").value
+
+})
+}
+);
+
+alert("Profil tersimpan.");
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+}
+
+
+$("imageFile").onchange=async e=>{
+
+const f=e.target.files[0];
+
+if(!f)return;
+
+const fd=new FormData();
+
+fd.append("image",f);
+
+try{
+
+currentImage=
+(await api(
+"/api/admin/upload",
+{
+method:"POST",
+body:fd
+}
+)).url;
+
+showImage(currentImage);
+
+$("image").value="";
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+};
+
+
+$("image").oninput=e=>{
+
+currentImage=e.target.value;
+
+showImage(currentImage);
+
+};
+
+
+function showImage(src){
+
+$("imagePreview").src=src||"";
+
+$("imagePreview").style.display=
+src?"block":"none";
+
+}
+
+
+async function loadMenus(){
+
+const data=
+await api("/api/admin/menus");
+
+$("menus").innerHTML=
+data.map(x=>`
+
+<div class="menu">
+
+${x.image?
+`<img src="${x.image}" onerror="this.style.display='none'">`
+:""}
+
+<h3>${esc(x.name)}</h3>
+
+<div>
+${esc(x.category)}
+· Rp${Number(x.price).toLocaleString("id-ID")}
+· <b>Stok ${x.stock}</b>
+</div>
+
+<p class="muted">
+${esc(x.description||"")}
+</p>
+
+<div class="actions">
+
+<button
+class="primary"
+onclick='editMenu(${JSON.stringify(x)})'>
+✏️ Edit
+</button>
+
+<button
+class="danger"
+onclick="delMenu(${x.id})">
+🗑️ Hapus
+</button>
+
+</div>
+
+</div>
+
+`).join("")
+||"<p>Belum ada menu.</p>";
+
+}
+
+
+function editMenu(x){
+
+$("editId").value=x.id;
+$("name").value=x.name;
+$("category").value=x.category;
+$("price").value=x.price;
+$("stock").value=x.stock;
+$("desc").value=x.description||"";
+
+currentImage=x.image||"";
+
+$("image").value=
+currentImage.startsWith("/uploads/")
+?""
+:currentImage;
+
+showImage(currentImage);
+
+scrollTo({
+top:0,
+behavior:"smooth"
+});
+
+}
+
+
+function resetMenu(){
+
+[
+"editId",
+"name",
+"price",
+"stock",
+"image",
+"desc"
+].forEach(id=>$(id).value="");
+
+$("category").value="Makanan";
+
+currentImage="";
+
+$("imageFile").value="";
+
+showImage("");
+
+}
+
+
+async function saveMenu(){
+
+const body={
+
+name:$("name").value,
+
+category:$("category").value,
+
+price:Number($("price").value),
+
+stock:Number($("stock").value)||0,
+
+image:currentImage,
+
+description:$("desc").value,
+
+active:1
+
+};
+
+try{
+
+const id=$("editId").value;
+
+await api(
+
+id
+?"/api/admin/menus/"+id
+:"/api/admin/menus",
+
+{
+
+method:id?"PUT":"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify(body)
+
+}
+
+);
+
+resetMenu();
+
+await loadMenus();
+
+alert("Menu tersimpan.");
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+}
+
+
+async function delMenu(id){
+
+if(!confirm("Hapus menu ini?"))
+return;
+
+try{
+
+await api(
+"/api/admin/menus/"+id,
+{
+method:"DELETE"
+}
+);
+
+await loadMenus();
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+}
+
+
+async function loadOrders(){
+
+const data=
+await api("/api/admin/orders");
+
+$("orders").innerHTML=
+data.map(o=>`
+
+<div class="order">
+
+<b>Pesanan #${o.id}</b>
+
+<span class="badge">
+${o.status}
+</span>
+
+<div>
+🪑 Meja ${esc(o.table_no)}
+·
+${new Date(
+o.created_at.replace(" ","T")+"Z"
+).toLocaleString("id-ID")}
+</div>
+
+<div class="muted">
+
+${esc(o.customer_name||"")}
+
+${o.note?
+" · "+esc(o.note)
+:""}
+
+</div>
+
+<ul>
+
+${o.items.map(i=>`
+
+<li>
+${esc(i.menu_name)}
+× ${i.quantity}
+=
+Rp${Number(i.subtotal).toLocaleString("id-ID")}
+</li>
+
+`).join("")}
+
+</ul>
+
+<b>
+Total Rp${Number(o.total).toLocaleString("id-ID")}
+</b>
+
+<div class="actions">
+
+<select
+onchange="setStatus(${o.id},this.value)">
+
+<option ${o.status=="baru"?"selected":""}>
+baru
+</option>
+
+<option ${o.status=="diproses"?"selected":""}>
+diproses
+</option>
+
+<option ${o.status=="siap"?"selected":""}>
+siap
+</option>
+
+<option ${o.status=="selesai"?"selected":""}>
+selesai
+</option>
+
+<option ${o.status=="dibatalkan"?"selected":""}>
+dibatalkan
+</option>
+
+</select>
+
+</div>
+
+</div>
+
+`).join("")
+||"<p>Belum ada pesanan.</p>";
+
+}
+
+
+async function setStatus(id,status){
+
+try{
+
+await api(
+"/api/admin/orders/"+id+"/status",
+{
+method:"PATCH",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({status})
+}
+);
+
+await loadOrders();
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+}
+
+
+async function changePassword(){
+
+try{
+
+await api(
+"/api/admin/password",
+{
+method:"PUT",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+
+old_password:$("oldPass").value,
+
+new_password:$("newPass").value
+
+})
+}
+);
+
+$("oldPass").value="";
+$("newPass").value="";
+
+alert("Password berhasil diganti.");
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+}
+
+
+async function logout(){
+
+await api(
+"/api/logout",
+{
+method:"POST"
+}
+);
+
+location.href="/admin";
+
+}
+
+
+function esc(v){
+
+return String(v??"")
+.replace(
+/[&<>"']/g,
+c=>({
+
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+"\"":"&quot;",
+"'":"&#39;"
+
+}[c])
+);
+
+}
+
+
+boot();
+
+setInterval(loadOrders,10000);
+
+</script>
+
+</body>
+  </html>
