@@ -1,0 +1,19 @@
+{
+  "name": "restoran-kita",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sistem restoran QR meja dengan admin, login, stok, foto menu, dan database SQLite.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.8.1",
+    "cookie-parser": "^1.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
