@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login Admin</title>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial;
+  background:#f5f5f5;
+  display:grid;
+  place-items:center;
+  min-height:100vh
+}
+
+.card{
+  width:min(92%,380px);
+  background:#fff;
+  padding:24px;
+  border-radius:18px;
+  box-shadow:0 8px 30px #0002
+}
+
+h1{
+  text-align:center
+}
+
+input,button{
+  width:100%;
+  padding:13px;
+  margin:7px 0;
+  box-sizing:border-box;
+  border-radius:10px;
+  border:1px solid #ccc
+}
+
+button{
+  border:0;
+  background:#b91c1c;
+  color:white;
+  font-weight:bold
+}
+
+.hint{
+  font-size:13px;
+  color:#666;
+  margin-top:12px
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>🔐 Admin Restoran</h1>
+
+<form id="f">
+
+<input
+id="u"
+placeholder="Username"
+autocomplete="username"
+required>
+
+<input
+id="p"
+type="password"
+placeholder="Password"
+autocomplete="current-password"
+required>
+
+<button>Masuk</button>
+
+</form>
+
+<div id="msg" class="hint"></div>
+
+</div>
+
+<script>
+
+f.onsubmit=async e=>{
+
+e.preventDefault();
+
+msg.textContent="Memeriksa...";
+
+const r=await fetch("/api/login",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+username:u.value,
+password:p.value
+})
+
+});
+
+const d=await r.json();
+
+if(r.ok)
+
+location.href="/admin.html";
+
+else
+
+msg.textContent=d.error||"Gagal login.";
+
+};
+
+</script>
+
+</body>
+</html>
