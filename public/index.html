@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Restoran</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f5f5f5;font-family:Arial;color:#222}
+.hero{background:#b91c1c;color:#fff;padding:20px 16px;text-align:center}
+.hero img{width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #fff}
+.wrap{max-width:900px;margin:auto;padding:16px}
+.table{background:#fff;padding:12px;border-radius:12px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.card{background:#fff;border-radius:14px;padding:12px;box-shadow:0 2px 10px #0001}
+.card img{width:100%;height:160px;object-fit:cover;border-radius:10px}
+.price{font-weight:bold;color:#b91c1c}
+.qty{display:flex;gap:8px;align-items:center}
+.qty button{width:38px;height:38px;border:0;border-radius:8px;font-size:18px}
+.qty input{width:55px;text-align:center;padding:8px}
+.cart{position:sticky;bottom:0;background:#fff;border-top:1px solid #ddd;padding:14px;box-shadow:0 -3px 15px #0002}
+input,textarea{width:100%;padding:11px;border:1px solid #ccc;border-radius:9px}
+button.order{width:100%;padding:13px;background:#198754;color:#fff;border:0;border-radius:10px;font-weight:bold}
+</style>
+</head>
+
+<body>
+
+<header class="hero">
+<img id="logo">
+<h1 id="title">RESTORAN KITA</h1>
+<div id="locationDisplay"></div>
+</header>
+
+<main class="wrap">
+
+<div class="table">
+<input id="customer" placeholder="Nama pelanggan (opsional)" style="margin-top:8px">
+
+<textarea id="note"
+placeholder="Catatan pesanan (opsional)"
+rows="2"
+style="margin-top:8px"></textarea>
+</div>
+
+<div id="menus" class="grid"></div>
+
+</main>
+
+<div class="cart">
+<div>
+<b>Keranjang: <span id="count">0</span> item</b>
+· Total <b>Rp<span id="total">0</span></b>
+</div>
+
+<button class="order" onclick="checkout()">
+Pesan — Bayar di Kasir
+</button>
+</div>
+
+<script>
+
+let menus=[],cart={};
+
+const params=new URLSearchParams(location.search);
+const table=params.get("meja")||"01";
+
+const esc=v=>String(v??"").replace(
+/[&<>"']/g,
+c=>({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+"\"":"&quot;",
+"'":"&#39;"
+}[c])
+);
+
+async function boot(){
+
+const s=await fetch("/api/settings").then(r=>r.json());
+
+title.textContent=s.name;
+
+if(s.location)
+document.getElementById("locationDisplay").textContent="📍 "+s.location;
+
+logo.src=s.logo||"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Crect width='100%25' height='100%25' fill='%23ddd'/%3E%3Ctext x='50%25' y='55%25' text-anchor='middle'%3ELOGO%3C/text%3E%3C/svg%3E";
+
+menus=await fetch("/api/menus").then(r=>r.json());
+
+render();
+
+}
+
+function render(){
+
+menusEl=document.getElementById("menus");
+
+menusEl.innerHTML=menus.map(m=>{
+
+const q=cart[m.id]||0;
+
+return `<div class="card">
+
+${m.image?`<img src="${m.image}" onerror="this.style.display='none'">`:""}
+
+<h3>${esc(m.name)}</h3>
+
+<div>${esc(m.category)}</div>
+
+<p>${esc(m.description||"")}</p>
+
+<div class="price">
+Rp${Number(m.price).toLocaleString("id-ID")}
+</div>
+
+<div>Stok tersedia: ${m.stock}</div>
+
+<div class="qty" style="margin-top:8px">
+
+<button onclick="change(${m.id},-1)">−</button>
+
+<input
+value="${q}"
+onchange="setQty(${m.id},this.value)"
+inputmode="numeric">
+
+<button onclick="change(${m.id},1)">+</button>
+
+</div>
+
+</div>`
+
+}).join("");
+
+update();
+
+}
+
+function setQty(id,v){
+
+const m=menus.find(x=>x.id==id);
+
+cart[id]=Math.max(
+0,
+Math.min(Number(m.stock),Number(v)||0)
+);
+
+render();
+
+}
+
+function change(id,n){
+
+setQty(id,(cart[id]||0)+n);
+
+}
+
+function update(){
+
+let c=0,t=0;
+
+menus.forEach(m=>{
+
+const q=cart[m.id]||0;
+
+c+=q;
+t+=q*m.price;
+
+});
+
+count.textContent=c;
+total.textContent=t.toLocaleString("id-ID");
+
+}
+
+async function checkout(){
+
+const items=Object.entries(cart)
+.filter(([_,q])=>q>0)
+.map(([id,q])=>({
+menu_id:Number(id),
+quantity:q
+}));
+
+if(!items.length)
+return alert("Pilih menu terlebih dahulu.");
+
+try{
+
+const r=await fetch("/api/orders",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+table_no:table,
+customer_name:customer.value,
+note:note.value,
+items
+
+})
+
+});
+
+const d=await r.json();
+
+if(!r.ok)
+throw new Error(d.error);
+
+alert(
+`Pesanan #${d.order_id} berhasil. Silakan bayar di kasir.`
+);
+
+cart={};
+
+menus=await fetch("/api/menus").then(r=>r.json());
+
+render();
+
+}catch(e){
+
+alert(e.message);
+
+}
+
+}
+
+boot();
+
+</script>
+
+</body>
+</html>
